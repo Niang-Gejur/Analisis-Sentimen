@@ -135,24 +135,22 @@ if uploaded_file:
     # ===============================
     # 8. Distribusi Sentimen (Bar + Pie)
     # ===============================
-    st.subheader("📊 Distribusi Sentimen")
+    import matplotlib.pyplot as plt
+import streamlit as st
 
-    # pastikan 3 kelas selalu ada
-    sentiment_counts = df_new["predicted_sentiment"].value_counts()
-    all_labels = ["Positif", "Netral", "Negatif"]
-    sentiment_counts = sentiment_counts.reindex(all_labels, fill_value=0)
+# Data untuk pie chart
+labels = ['Positif', 'Netral', 'Negatif']
+jumlah = [total_positif, total_netral, total_negatif]
+warna = ['#2ecc71', '#f1c40f', '#e74c3c']  # Hijau, Kuning, Merah
 
-    # bar chart
-    st.bar_chart(sentiment_counts)
+# Membuat pie chart
+fig, ax = plt.subplots(figsize=(7, 7))
+ax.pie(jumlah, labels=labels, colors=warna, autopct='%1.1f%%', startangle=140)
+ax.set_title('Distribusi Sentimen Ulasan Mobile Legends')
+ax.axis('equal')  # Agar lingkaran sempurna
 
-    # pie chart
-    st.markdown("**Distribusi Sentimen (Pie Chart)**")
-    fig_pie, ax_pie = plt.subplots()
-    ax_pie.pie(sentiment_counts, labels=sentiment_counts.index,
-               autopct='%1.1f%%', colors=["#90EE90", "#FFD700", "#6495ED"],
-               startangle=90, wedgeprops={"edgecolor": "black"})
-    ax_pie.axis("equal")
-    st.pyplot(fig_pie)
+# Tampilkan di Streamlit
+st.pyplot(fig)
 
     # ===============================
     # 9. Wordcloud per Sentimen
