@@ -1,9 +1,9 @@
 streamlit
-scikit-learn
 pandas
 numpy
-nltk
-joblib
-wordcloud
+scikit-learn
 matplotlib
+seaborn
+wordcloud
+nltk
 openpyxl
