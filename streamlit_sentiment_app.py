@@ -135,9 +135,6 @@ if uploaded_file:
     # ===============================
     # 8. Distribusi Sentimen (Bar + Pie)
     # ===============================
-    import matplotlib.pyplot as plt
-import streamlit as st
-
 # Data untuk pie chart
 labels = ['Positif', 'Netral', 'Negatif']
 jumlah = [total_positif, total_netral, total_negatif]
