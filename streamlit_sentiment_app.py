@@ -4,12 +4,11 @@ import numpy as np
 import re
 import nltk
 import matplotlib.pyplot as plt
-import seaborn as sns
 from wordcloud import WordCloud
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, ConfusionMatrixDisplay
 
 nltk.download("punkt")
 nltk.download("wordnet")
@@ -64,9 +63,6 @@ model, vectorizer, acc, report, cm, labels = train_model()
 st.subheader("📂 Upload Dataset Baru untuk Prediksi")
 uploaded_file = st.file_uploader("Upload file .xlsx", type=["xlsx"])
 
-# Slider threshold
-threshold = st.slider("Set threshold fallback ke Netral (0.0 - 1.0)", 0.0, 1.0, 0.5, 0.05)
-
 if uploaded_file:
     df_new = pd.read_excel(uploaded_file)
 
@@ -82,32 +78,25 @@ if uploaded_file:
 
     # transformasi & prediksi
     X_new = vectorizer.transform(df_new["clean_text"])
-    probs = model.predict_proba(X_new)
-    preds = []
-    for p in probs:
-        if max(p) < threshold:
-            preds.append("netral")
-        else:
-            preds.append(model.classes_[np.argmax(p)])
+    preds = model.predict(X_new)
     df_new["predicted_sentiment"] = preds
 
     # ===============================
-    # 5. EVALUASI MODEL
+    # 5. EVALUASI MODEL (DATA TRAINING)
     # ===============================
     st.subheader("🔹 Evaluasi Model (Data Training)")
     st.write("Akurasi Training:", round(acc, 4))
     st.text(report)
 
-    # Confusion Matrix
+    # Confusion Matrix Training
     st.subheader("📉 Confusion Matrix (Data Training)")
     fig, ax = plt.subplots()
-    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=labels, yticklabels=labels, ax=ax)
-    ax.set_xlabel("Predicted")
-    ax.set_ylabel("Actual")
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
+    disp.plot(ax=ax, cmap="Blues", colorbar=False)
     st.pyplot(fig)
 
     # ===============================
-    # 6. HASIL PREDIKSI
+    # 6. HASIL PREDIKSI DATASET BARU
     # ===============================
     st.subheader("🔹 Hasil Prediksi (contoh 20 baris)")
     st.dataframe(df_new[["clean_text", "predicted_sentiment"]].head(20))
@@ -128,3 +117,25 @@ if uploaded_file:
             ax.imshow(wc, interpolation="bilinear")
             ax.axis("off")
             st.pyplot(fig)
+
+    # ===============================
+    # 7. EVALUASI DATASET BARU (JIKA ADA LABEL)
+    # ===============================
+    if "klasifikasi" in df_new.columns:
+        st.subheader("🔹 Evaluasi Dataset Baru (dengan Label Asli)")
+        y_true = df_new["klasifikasi"].astype(str)
+        y_pred = df_new["predicted_sentiment"]
+
+        acc_new = accuracy_score(y_true, y_pred)
+        report_new = classification_report(y_true, y_pred, output_dict=False)
+        cm_new = confusion_matrix(y_true, y_pred, labels=model.classes_)
+
+        st.write("Akurasi Dataset Baru:", round(acc_new, 4))
+        st.text(report_new)
+
+        # Confusion Matrix Baru
+        st.subheader("📉 Confusion Matrix (Dataset Baru)")
+        fig, ax = plt.subplots()
+        disp_new = ConfusionMatrixDisplay(confusion_matrix=cm_new, display_labels=labels)
+        disp_new.plot(ax=ax, cmap="Oranges", colorbar=False)
+        st.pyplot(fig)
