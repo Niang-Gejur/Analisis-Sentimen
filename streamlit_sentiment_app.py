@@ -11,7 +11,7 @@ from wordcloud import WordCloud
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import MultinomialNB
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, ConfusionMatrixDisplay
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from textblob import TextBlob
 
 nltk.download("punkt")
@@ -52,7 +52,7 @@ def auto_label_with_textblob(df, text_col="clean_text"):
 # ===============================
 # 3. STREAMLIT APP
 # ===============================
-st.title("📊 Sentiment Analysis App (Naïve Bayes + Streamlit)")
+st.title("📊 ANALISIS SENTIMEN PENGGUNA MOBILE LEGENDS DI TWITTER MENGGUNAKAN ALGORITMA NAÏVE BAYES")
 
 vectorizer = TfidfVectorizer()
 model = MultinomialNB()
@@ -66,7 +66,7 @@ uploaded_file = st.file_uploader("Upload file .xlsx", type=["xlsx"])
 if uploaded_file:
     df_new = pd.read_excel(uploaded_file)
 
-    # Cari kolom teks utama (prioritas: full_text > stemmed_text > clean_text)
+    # Cari kolom teks utama
     text_col = None
     for candidate in ["full_text", "stemmed_text", "clean_text"]:
         if candidate in df_new.columns:
@@ -83,15 +83,13 @@ if uploaded_file:
     else:
         df_new["clean_text"] = df_new["clean_text"].astype(str)
 
-    # Auto labeling jika kolom klasifikasi tidak ada
+    # Auto labeling jika tidak ada klasifikasi
     if "klasifikasi" not in df_new.columns:
         st.info("Kolom 'klasifikasi' tidak ditemukan → Label otomatis dibuat dengan TextBlob.")
         df_new, pos, net, neg = auto_label_with_textblob(df_new, text_col="clean_text")
         st.success(f"Label otomatis selesai: Positif={pos}, Netral={net}, Negatif={neg}")
 
-    # ===============================
-    # 5. Split Data & Training
-    # ===============================
+    # Split data
     X = df_new["clean_text"].astype(str)
     y = df_new["klasifikasi"].astype(str)
 
@@ -103,7 +101,7 @@ if uploaded_file:
     # Evaluasi
     y_pred = model.predict(X_test)
     acc = accuracy_score(y_test, y_pred)
-    report = classification_report(y_test, y_pred)
+    report = classification_report(y_test, y_pred, labels=["Positif", "Netral", "Negatif"])
 
     st.subheader("📊 Evaluasi Model (Train/Test Split)")
     st.write("Akurasi:", round(acc, 4))
@@ -113,25 +111,16 @@ if uploaded_file:
     # 6. Confusion Matrix
     # ===============================
     st.subheader("📉 Confusion Matrix")
+    labels = ["Positif", "Netral", "Negatif"]
+    cm = confusion_matrix(y_test, y_pred, labels=labels)
 
-    cm = confusion_matrix(y_test, y_pred, labels=model.classes_)
-
-    # Versi Heatmap
-    st.markdown("**🔹 Confusion Matrix (Heatmap - Seaborn)**")
     fig, ax = plt.subplots(figsize=(6, 5))
     sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
-                xticklabels=model.classes_, yticklabels=model.classes_, ax=ax)
+                xticklabels=labels, yticklabels=labels, ax=ax)
     ax.set_xlabel("Predicted Label")
     ax.set_ylabel("True Label")
     ax.set_title("Confusion Matrix - Heatmap")
     st.pyplot(fig)
-
-    # Versi Display
-    st.markdown("**🔹 Confusion Matrix (Display - Sklearn)**")
-    fig2, ax2 = plt.subplots()
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.classes_)
-    disp.plot(ax=ax2, cmap="Blues", colorbar=False)
-    st.pyplot(fig2)
 
     # ===============================
     # 7. Hasil Prediksi
@@ -144,17 +133,18 @@ if uploaded_file:
     # 8. Distribusi Sentimen
     # ===============================
     st.subheader("📊 Distribusi Sentimen")
-    st.bar_chart(df_new["predicted_sentiment"].value_counts())
+    st.bar_chart(df_new["predicted_sentiment"].value_counts().reindex(labels, fill_value=0))
 
     # ===============================
     # 9. Wordcloud per Sentimen
     # ===============================
     st.subheader("☁️ Wordcloud per Sentimen")
-    sentiments = df_new["predicted_sentiment"].unique()
-    for sent in sentiments:
+    color_map = {"Positif": "Greens", "Netral": "Blues", "Negatif": "Reds"}
+
+    for sent in labels:
         text_data = " ".join(df_new[df_new["predicted_sentiment"] == sent]["clean_text"])
         if text_data.strip():
-            wc = WordCloud(width=600, height=400, background_color="white").generate(text_data)
+            wc = WordCloud(width=600, height=400, background_color="white", colormap=color_map[sent]).generate(text_data)
             st.write(f"**Sentimen: {sent}**")
             fig, ax = plt.subplots()
             ax.imshow(wc, interpolation="bilinear")
