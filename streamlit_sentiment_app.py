@@ -133,24 +133,6 @@ if uploaded_file:
     st.dataframe(df_new[[text_col, "predicted_sentiment"]].head(20))
 
     # ===============================
-    # 8. Distribusi Sentimen (Bar + Pie)
-    # ===============================
- st.subheader("📊 Distribusi Sentimen")
-# Data untuk pie chart
-labels = ['Positif', 'Netral', 'Negatif']
-jumlah = [total_positif, total_netral, total_negatif]
-warna = ['#2ecc71', '#f1c40f', '#e74c3c']  # Hijau, Kuning, Merah
-
-# Membuat pie chart
-fig, ax = plt.subplots(figsize=(7, 7))
-ax.pie(jumlah, labels=labels, colors=warna, autopct='%1.1f%%', startangle=140)
-ax.set_title('Distribusi Sentimen Ulasan Mobile Legends')
-ax.axis('equal')  # Agar lingkaran sempurna
-
-# Tampilkan di Streamlit
-st.pyplot(fig)
-
-    # ===============================
     # 9. Wordcloud per Sentimen
     # ===============================
     st.subheader("☁️ Wordcloud per Sentimen")
