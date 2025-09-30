@@ -42,7 +42,11 @@ def train_model():
     model = MultinomialNB()
     model.fit(X_vec, y)
 
-    return model, vectorizer
+    y_pred = model.predict(X_vec)
+    acc = accuracy_score(y, y_pred)
+    report = classification_report(y, y_pred, output_dict=False)
+
+    return model, vectorizer, acc, report
 
 # ===============================
 # 3. STREAMLIT APP
@@ -50,7 +54,7 @@ def train_model():
 st.title("📊 Sentiment Analysis App (Naïve Bayes + Streamlit)")
 
 # Train model once
-model, vectorizer = train_model()
+model, vectorizer, acc, report = train_model()
 
 # ===============================
 # 4. UPLOAD DATASET BARU
@@ -58,75 +62,53 @@ model, vectorizer = train_model()
 st.subheader("📂 Upload Dataset Baru untuk Prediksi")
 uploaded_file = st.file_uploader("Upload file .xlsx", type=["xlsx"])
 
+# Tambahkan slider threshold
+threshold = st.slider("Set threshold fallback ke Netral (0.0 - 1.0)", 0.0, 1.0, 0.5, 0.05)
+
 if uploaded_file:
     df_new = pd.read_excel(uploaded_file)
 
-    # Deteksi kolom teks
-    if "clean_text" in df_new.columns:
-        text_col = "clean_text"
-    elif "full_text" in df_new.columns:
-        text_col = "full_text"
-        df_new["clean_text"] = df_new[text_col].astype(str).apply(preprocess_text)
+    if "clean_text" not in df_new.columns:
+        st.error("Kolom 'clean_text' tidak ditemukan dalam dataset!")
     else:
-        st.error("Dataset harus punya kolom 'clean_text' atau 'full_text'")
-        st.stop()
+        X_new = vectorizer.transform(df_new["clean_text"])
 
-    # Prediksi
-    X_new = vectorizer.transform(df_new["clean_text"].astype(str))
-    preds = model.predict(X_new)
-    df_new["predicted_sentiment"] = preds
+        # Prediksi dengan threshold
+        probs = model.predict_proba(X_new)
+        preds = []
+        for p in probs:
+            if max(p) < threshold:
+                preds.append("netral")
+            else:
+                preds.append(model.classes_[np.argmax(p)])
+        df_new["predicted_sentiment"] = preds
 
-    st.subheader("🔹 Hasil Prediksi (contoh 20 baris)")
-    st.dataframe(df_new[[text_col, "predicted_sentiment"]].head(20))
-
-    # ===============================
-    # 5. Evaluasi jika ada label
-    # ===============================
-    if "klasifikasi" in df_new.columns:
-        y_true = df_new["klasifikasi"].astype(str)
-        y_pred = df_new["predicted_sentiment"]
-
-        acc = accuracy_score(y_true, y_pred)
-        report = classification_report(y_true, y_pred)
-
-        st.subheader("📌 Evaluasi Model pada Dataset Baru")
-        st.write("Akurasi:", round(acc, 4))
+        # ===============================
+        # 5. EVALUASI MODEL (SETELAH UPLOAD)
+        # ===============================
+        st.subheader("🔹 Evaluasi Model")
+        st.write("Akurasi Training:", round(acc, 4))
         st.text(report)
 
-        # Confusion Matrix pakai matplotlib (tanpa seaborn)
-        cm = confusion_matrix(y_true, y_pred)
-        fig, ax = plt.subplots()
-        im = ax.imshow(cm, cmap="Blues")
+        # ===============================
+        # 6. HASIL PREDIKSI
+        # ===============================
+        st.subheader("🔹 Hasil Prediksi (contoh 20 baris)")
+        st.dataframe(df_new[["clean_text", "predicted_sentiment"]].head(20))
 
-        for i in range(len(cm)):
-            for j in range(len(cm[i])):
-                ax.text(j, i, cm[i, j], ha="center", va="center", color="black")
+        # Distribusi Sentimen
+        st.subheader("📊 Distribusi Sentimen")
+        st.bar_chart(df_new["predicted_sentiment"].value_counts())
 
-        ax.set_xlabel("Prediksi")
-        ax.set_ylabel("Aktual")
-        ax.set_xticks(range(len(np.unique(y_true))))
-        ax.set_yticks(range(len(np.unique(y_true))))
-        ax.set_xticklabels(np.unique(y_true))
-        ax.set_yticklabels(np.unique(y_true))
-        st.pyplot(fig)
-
-    # ===============================
-    # 6. Distribusi Sentimen
-    # ===============================
-    st.subheader("📊 Distribusi Sentimen")
-    st.bar_chart(df_new["predicted_sentiment"].value_counts())
-
-    # ===============================
-    # 7. Wordcloud per kelas
-    # ===============================
-    st.subheader("☁️ Wordcloud per Sentimen")
-    sentiments = df_new["predicted_sentiment"].unique()
-    for sent in sentiments:
-        text_data = " ".join(df_new[df_new["predicted_sentiment"] == sent]["clean_text"])
-        if text_data.strip():
-            wc = WordCloud(width=600, height=400, background_color="white").generate(text_data)
-            st.write(f"**Sentimen: {sent}**")
-            fig, ax = plt.subplots()
-            ax.imshow(wc, interpolation="bilinear")
-            ax.axis("off")
-            st.pyplot(fig)
+        # Wordcloud per kelas
+        st.subheader("☁️ Wordcloud per Sentimen")
+        sentiments = df_new["predicted_sentiment"].unique()
+        for sent in sentiments:
+            text_data = " ".join(df_new[df_new["predicted_sentiment"] == sent]["clean_text"])
+            if text_data.strip():
+                wc = WordCloud(width=600, height=400, background_color="white").generate(text_data)
+                st.write(f"**Sentimen: {sent}**")
+                fig, ax = plt.subplots()
+                ax.imshow(wc, interpolation="bilinear")
+                ax.axis("off")
+                st.pyplot(fig)
