@@ -9,8 +9,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from wordcloud import WordCloud
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import MultinomialNB
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, ConfusionMatrixDisplay
 from textblob import TextBlob
 
 nltk.download("punkt")
@@ -89,28 +90,34 @@ if uploaded_file:
         st.success(f"Label otomatis selesai: Positif={pos}, Netral={net}, Negatif={neg}")
 
     # ===============================
-    # 5. Training & Evaluasi Model
+    # 5. Split Data & Training
     # ===============================
     X = df_new["clean_text"].astype(str)
     y = df_new["klasifikasi"].astype(str)
 
     X_vec = vectorizer.fit_transform(X)
-    model.fit(X_vec, y)
+    X_train, X_test, y_train, y_test = train_test_split(X_vec, y, test_size=0.2, random_state=42)
 
-    y_pred = model.predict(X_vec)
-    acc = accuracy_score(y, y_pred)
-    report = classification_report(y, y_pred)
+    model.fit(X_train, y_train)
 
-    st.subheader("📊 Evaluasi Model (Dataset Baru)")
+    # Evaluasi
+    y_pred = model.predict(X_test)
+    acc = accuracy_score(y_test, y_pred)
+    report = classification_report(y_test, y_pred)
+
+    st.subheader("📊 Evaluasi Model (Train/Test Split)")
     st.write("Akurasi:", round(acc, 4))
     st.text(report)
 
     # ===============================
-    # 6. Confusion Matrix (Heatmap)
+    # 6. Confusion Matrix
     # ===============================
     st.subheader("📉 Confusion Matrix")
-    cm = confusion_matrix(y, y_pred, labels=model.classes_)
 
+    cm = confusion_matrix(y_test, y_pred, labels=model.classes_)
+
+    # Versi Heatmap
+    st.markdown("**🔹 Confusion Matrix (Heatmap - Seaborn)**")
     fig, ax = plt.subplots(figsize=(6, 5))
     sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
                 xticklabels=model.classes_, yticklabels=model.classes_, ax=ax)
@@ -119,21 +126,33 @@ if uploaded_file:
     ax.set_title("Confusion Matrix - Heatmap")
     st.pyplot(fig)
 
+    # Versi Display
+    st.markdown("**🔹 Confusion Matrix (Display - Sklearn)**")
+    fig2, ax2 = plt.subplots()
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.classes_)
+    disp.plot(ax=ax2, cmap="Blues", colorbar=False)
+    st.pyplot(fig2)
+
     # ===============================
     # 7. Hasil Prediksi
     # ===============================
     st.subheader("🔹 Hasil Prediksi (contoh 20 baris)")
-    st.dataframe(df_new[[text_col, "klasifikasi"]].head(20))
+    df_new["predicted_sentiment"] = model.predict(X_vec)
+    st.dataframe(df_new[[text_col, "predicted_sentiment"]].head(20))
 
-    # Distribusi Sentimen
+    # ===============================
+    # 8. Distribusi Sentimen
+    # ===============================
     st.subheader("📊 Distribusi Sentimen")
-    st.bar_chart(df_new["klasifikasi"].value_counts())
+    st.bar_chart(df_new["predicted_sentiment"].value_counts())
 
-    # Wordcloud per Sentimen
+    # ===============================
+    # 9. Wordcloud per Sentimen
+    # ===============================
     st.subheader("☁️ Wordcloud per Sentimen")
-    sentiments = df_new["klasifikasi"].unique()
+    sentiments = df_new["predicted_sentiment"].unique()
     for sent in sentiments:
-        text_data = " ".join(df_new[df_new["klasifikasi"] == sent]["clean_text"])
+        text_data = " ".join(df_new[df_new["predicted_sentiment"] == sent]["clean_text"])
         if text_data.strip():
             wc = WordCloud(width=600, height=400, background_color="white").generate(text_data)
             st.write(f"**Sentimen: {sent}**")
@@ -141,3 +160,14 @@ if uploaded_file:
             ax.imshow(wc, interpolation="bilinear")
             ax.axis("off")
             st.pyplot(fig)
+
+    # ===============================
+    # 10. Download Hasil Prediksi
+    # ===============================
+    csv = df_new.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        label="💾 Download Hasil Prediksi (CSV)",
+        data=csv,
+        file_name="hasil_sentimen.csv",
+        mime="text/csv",
+    )
