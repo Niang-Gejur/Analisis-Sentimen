@@ -141,12 +141,30 @@ if uploaded_file:
     st.dataframe(df_new[[text_col, "predicted_sentiment"]].head(20))
 
     # ===============================
+      # ===============================
     # 8. Distribusi Sentimen
     # ===============================
     st.subheader("📊 Distribusi Sentimen")
+
+    # Bar Chart
+    st.markdown("**Distribusi Sentimen (Bar Chart)**")
     st.bar_chart(df_new["predicted_sentiment"].value_counts())
 
-    # ===============================
+    # Pie Chart
+    st.markdown("**Distribusi Sentimen (Pie Chart)**")
+    sentiment_counts = df_new["predicted_sentiment"].value_counts()
+
+    fig_pie, ax_pie = plt.subplots()
+    ax_pie.pie(
+        sentiment_counts,
+        labels=sentiment_counts.index,
+        autopct="%1.1f%%",
+        startangle=90,
+        colors=["#66b3ff", "#99ff99", "#ff9999"]  # biru, hijau, merah
+    )
+    ax_pie.axis("equal")  # membuat pie chart berbentuk lingkaran sempurna
+    st.pyplot(fig_pie)
+
     # 9. Wordcloud per Sentimen
     # ===============================
     st.subheader("☁️ Wordcloud per Sentimen")
