@@ -86,13 +86,22 @@ if uploaded_file:
             st.write("Akurasi:", round(acc, 4))
             st.text(report)
 
-            # Confusion Matrix
             cm = confusion_matrix(y_true, y_pred)
-            fig, ax = plt.subplots()
-            sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=np.unique(y_true), yticklabels=np.unique(y_true), ax=ax)
-            ax.set_xlabel("Prediksi")
-            ax.set_ylabel("Aktual")
-            st.pyplot(fig)
+fig, ax = plt.subplots()
+im = ax.imshow(cm, cmap="Blues")
+
+# Tambah angka di setiap sel
+for i in range(len(cm)):
+    for j in range(len(cm[i])):
+        ax.text(j, i, cm[i, j], ha="center", va="center", color="black")
+
+ax.set_xlabel("Prediksi")
+ax.set_ylabel("Aktual")
+ax.set_xticks(range(len(np.unique(y_true))))
+ax.set_yticks(range(len(np.unique(y_true))))
+ax.set_xticklabels(np.unique(y_true))
+ax.set_yticklabels(np.unique(y_true))
+st.pyplot(fig)
 
         # Distribusi Sentimen
         st.subheader("📊 Distribusi Sentimen")
