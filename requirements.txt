@@ -3,7 +3,8 @@ pandas
 numpy
 scikit-learn
 matplotlib
-seaborn
 wordcloud
 nltk
+textblob
 openpyxl
+
