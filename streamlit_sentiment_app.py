@@ -52,7 +52,7 @@ def auto_label_with_textblob(df, text_col="clean_text"):
 # ===============================
 # 3. STREAMLIT APP
 # ===============================
-st.title("📊 ANALISIS SENTIMEN PENGGUNA MOBILE LEGENDS DI TWITTER MENGGUNAKAN ALGORITMA NAÏVE BAYES")
+st.title("📊 Sentiment Analysis App (Naïve Bayes + Streamlit)")
 
 vectorizer = TfidfVectorizer()
 model = MultinomialNB()
@@ -117,6 +117,7 @@ if uploaded_file:
     cm = confusion_matrix(y_test, y_pred, labels=model.classes_)
 
     # Versi Heatmap
+    st.markdown("**🔹 Confusion Matrix (Heatmap - Seaborn)**")
     fig, ax = plt.subplots(figsize=(6, 5))
     sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
                 xticklabels=model.classes_, yticklabels=model.classes_, ax=ax)
@@ -124,6 +125,13 @@ if uploaded_file:
     ax.set_ylabel("True Label")
     ax.set_title("Confusion Matrix - Heatmap")
     st.pyplot(fig)
+
+    # Versi Display
+    st.markdown("**🔹 Confusion Matrix (Display - Sklearn)**")
+    fig2, ax2 = plt.subplots()
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.classes_)
+    disp.plot(ax=ax2, cmap="Blues", colorbar=False)
+    st.pyplot(fig2)
 
     # ===============================
     # 7. Hasil Prediksi
@@ -133,16 +141,38 @@ if uploaded_file:
     st.dataframe(df_new[[text_col, "predicted_sentiment"]].head(20))
 
     # ===============================
+      # ===============================
+    # 8. Distribusi Sentimen
+    # ===============================
+    st.subheader("📊 Distribusi Sentimen")
+
+    # Bar Chart
+    st.markdown("**Distribusi Sentimen (Bar Chart)**")
+    st.bar_chart(df_new["predicted_sentiment"].value_counts())
+
+    # Pie Chart
+    st.markdown("**Distribusi Sentimen (Pie Chart)**")
+    sentiment_counts = df_new["predicted_sentiment"].value_counts()
+
+    fig_pie, ax_pie = plt.subplots()
+    ax_pie.pie(
+        sentiment_counts,
+        labels=sentiment_counts.index,
+        autopct="%1.1f%%",
+        startangle=90,
+        colors=["#66b3ff", "#99ff99", "#ff9999"]  # biru, hijau, merah
+    )
+    ax_pie.axis("equal")  # membuat pie chart berbentuk lingkaran sempurna
+    st.pyplot(fig_pie)
+
     # 9. Wordcloud per Sentimen
     # ===============================
     st.subheader("☁️ Wordcloud per Sentimen")
-    sentiments = sentiment_counts.index  # gunakan urutan lengkap
-    colors = {"Positif": "Greens", "Netral": "Greys", "Negatif": "Reds"}
-
+    sentiments = df_new["predicted_sentiment"].unique()
     for sent in sentiments:
         text_data = " ".join(df_new[df_new["predicted_sentiment"] == sent]["clean_text"])
         if text_data.strip():
-            wc = WordCloud(width=600, height=400, background_color="white", colormap=colors[sent]).generate(text_data)
+            wc = WordCloud(width=600, height=400, background_color="white").generate(text_data)
             st.write(f"**Sentimen: {sent}**")
             fig, ax = plt.subplots()
             ax.imshow(wc, interpolation="bilinear")
