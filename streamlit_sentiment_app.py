@@ -9,6 +9,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+import seaborn as sns
 
 nltk.download("punkt")
 nltk.download("wordnet")
@@ -42,11 +43,7 @@ def train_model():
     model = MultinomialNB()
     model.fit(X_vec, y)
 
-    y_pred = model.predict(X_vec)
-    acc = accuracy_score(y, y_pred)
-    report = classification_report(y, y_pred, output_dict=False)
-
-    return model, vectorizer, acc, report
+    return model, vectorizer
 
 # ===============================
 # 3. STREAMLIT APP
@@ -54,11 +51,7 @@ def train_model():
 st.title("📊 Sentiment Analysis App (Naïve Bayes + Streamlit)")
 
 # Train model once
-model, vectorizer, acc, report = train_model()
-
-st.subheader("🔹 Evaluasi Model")
-st.write("Akurasi Training:", round(acc, 4))
-st.text(report)
+model, vectorizer = train_model()
 
 # ===============================
 # 4. UPLOAD DATASET BARU
@@ -69,16 +62,37 @@ uploaded_file = st.file_uploader("Upload file .xlsx", type=["xlsx"])
 if uploaded_file:
     df_new = pd.read_excel(uploaded_file)
 
-    if "full_text" not in df_new.columns:
-        st.error("Kolom 'text_clean' tidak ditemukan dalam dataset!")
+    if "clean_text" not in df_new.columns:
+        st.error("Kolom 'clean_text' tidak ditemukan dalam dataset!")
     else:
-        df_new["clean_text"] = df_new["full_text"].astype(str).apply(preprocess_text)
-        X_new = vectorizer.transform(df_new["clean_text"])
+        X_new = vectorizer.transform(df_new["clean_text"].astype(str))
         preds = model.predict(X_new)
         df_new["predicted_sentiment"] = preds
 
         st.subheader("🔹 Hasil Prediksi (contoh 20 baris)")
-        st.dataframe(df_new[["full_text", "predicted_sentiment"]].head(20))
+        st.dataframe(df_new[["clean_text", "predicted_sentiment"]].head(20))
+
+        # ===============================
+        # 5. Evaluasi jika ada label
+        # ===============================
+        if "klasifikasi" in df_new.columns:
+            y_true = df_new["klasifikasi"].astype(str)
+            y_pred = df_new["predicted_sentiment"]
+
+            acc = accuracy_score(y_true, y_pred)
+            report = classification_report(y_true, y_pred)
+
+            st.subheader("📌 Evaluasi Model pada Dataset Baru")
+            st.write("Akurasi:", round(acc, 4))
+            st.text(report)
+
+            # Confusion Matrix
+            cm = confusion_matrix(y_true, y_pred)
+            fig, ax = plt.subplots()
+            sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=np.unique(y_true), yticklabels=np.unique(y_true), ax=ax)
+            ax.set_xlabel("Prediksi")
+            ax.set_ylabel("Aktual")
+            st.pyplot(fig)
 
         # Distribusi Sentimen
         st.subheader("📊 Distribusi Sentimen")
