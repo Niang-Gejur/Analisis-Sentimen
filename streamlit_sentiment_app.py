@@ -51,7 +51,7 @@ def auto_label_with_textblob(df, text_col="clean_text"):
 # ===============================
 # 3. STREAMLIT APP
 # ===============================
-st.title("📊 Sentiment Analysis App (Naïve Bayes + Streamlit)")
+st.title("📊 Analisis Sentimen ")
 
 vectorizer = TfidfVectorizer()
 model = MultinomialNB()
