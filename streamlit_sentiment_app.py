@@ -135,6 +135,7 @@ if uploaded_file:
     # ===============================
     # 8. Distribusi Sentimen (Bar + Pie)
     # ===============================
+ st.subheader("📊 Distribusi Sentimen")
 # Data untuk pie chart
 labels = ['Positif', 'Netral', 'Negatif']
 jumlah = [total_positif, total_netral, total_negatif]
