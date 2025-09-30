@@ -9,7 +9,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-import seaborn as sns
 
 nltk.download("punkt")
 nltk.download("wordnet")
@@ -86,28 +85,32 @@ if uploaded_file:
             st.write("Akurasi:", round(acc, 4))
             st.text(report)
 
+            # Confusion Matrix pakai matplotlib (tanpa seaborn)
             cm = confusion_matrix(y_true, y_pred)
-fig, ax = plt.subplots()
-im = ax.imshow(cm, cmap="Blues")
+            fig, ax = plt.subplots()
+            im = ax.imshow(cm, cmap="Blues")
 
-# Tambah angka di setiap sel
-for i in range(len(cm)):
-    for j in range(len(cm[i])):
-        ax.text(j, i, cm[i, j], ha="center", va="center", color="black")
+            for i in range(len(cm)):
+                for j in range(len(cm[i])):
+                    ax.text(j, i, cm[i, j], ha="center", va="center", color="black")
 
-ax.set_xlabel("Prediksi")
-ax.set_ylabel("Aktual")
-ax.set_xticks(range(len(np.unique(y_true))))
-ax.set_yticks(range(len(np.unique(y_true))))
-ax.set_xticklabels(np.unique(y_true))
-ax.set_yticklabels(np.unique(y_true))
-st.pyplot(fig)
+            ax.set_xlabel("Prediksi")
+            ax.set_ylabel("Aktual")
+            ax.set_xticks(range(len(np.unique(y_true))))
+            ax.set_yticks(range(len(np.unique(y_true))))
+            ax.set_xticklabels(np.unique(y_true))
+            ax.set_yticklabels(np.unique(y_true))
+            st.pyplot(fig)
 
-        # Distribusi Sentimen
+        # ===============================
+        # 6. Distribusi Sentimen
+        # ===============================
         st.subheader("📊 Distribusi Sentimen")
         st.bar_chart(df_new["predicted_sentiment"].value_counts())
 
-        # Wordcloud per kelas
+        # ===============================
+        # 7. Wordcloud per kelas
+        # ===============================
         st.subheader("☁️ Wordcloud per Sentimen")
         sentiments = df_new["predicted_sentiment"].unique()
         for sent in sentiments:
