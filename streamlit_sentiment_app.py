@@ -64,58 +64,69 @@ uploaded_file = st.file_uploader("Upload file .xlsx", type=["xlsx"])
 if uploaded_file:
     df_new = pd.read_excel(uploaded_file)
 
-    if "full_text" not in df_new.columns:
-        st.error("Kolom 'full_text' tidak ditemukan dalam dataset!")
+    # Cari kolom teks utama (prioritas: full_text > stemmed_text > clean_text)
+    text_col = None
+    for candidate in ["full_text", "stemmed_text", "clean_text"]:
+        if candidate in df_new.columns:
+            text_col = candidate
+            break
+
+    if text_col is None:
+        st.error("Dataset harus punya salah satu kolom teks: 'full_text', 'stemmed_text', atau 'clean_text'.")
+        st.stop()
+
+    # Buat kolom clean_text
+    if text_col != "clean_text":
+        df_new["clean_text"] = df_new[text_col].astype(str).apply(preprocess_text)
     else:
-        # Preprocessing
-        df_new["clean_text"] = df_new["full_text"].astype(str).apply(preprocess_text)
+        df_new["clean_text"] = df_new["clean_text"].astype(str)
 
-        # Auto labeling jika kolom klasifikasi tidak ada
-        if "klasifikasi" not in df_new.columns:
-            st.info("Kolom 'klasifikasi' tidak ditemukan → Label otomatis dibuat dengan TextBlob.")
-            df_new, pos, net, neg = auto_label_with_textblob(df_new, text_col="clean_text")
-            st.success(f"Label otomatis selesai: Positif={pos}, Netral={net}, Negatif={neg}")
+    # Auto labeling jika kolom klasifikasi tidak ada
+    if "klasifikasi" not in df_new.columns:
+        st.info("Kolom 'klasifikasi' tidak ditemukan → Label otomatis dibuat dengan TextBlob.")
+        df_new, pos, net, neg = auto_label_with_textblob(df_new, text_col="clean_text")
+        st.success(f"Label otomatis selesai: Positif={pos}, Netral={net}, Negatif={neg}")
 
-        # Training model dengan dataset baru
-        X = df_new["clean_text"].astype(str)
-        y = df_new["klasifikasi"].astype(str)
-        X_vec = vectorizer.fit_transform(X)
-        model.fit(X_vec, y)
+    # Training model dengan dataset baru
+    X = df_new["clean_text"].astype(str)
+    y = df_new["klasifikasi"].astype(str)
+    X_vec = vectorizer.fit_transform(X)
+    model.fit(X_vec, y)
 
-        # Evaluasi
-        y_pred = model.predict(X_vec)
-        acc = accuracy_score(y, y_pred)
-        report = classification_report(y, y_pred)
+    # Evaluasi
+    y_pred = model.predict(X_vec)
+    acc = accuracy_score(y, y_pred)
+    report = classification_report(y, y_pred)
 
-        st.subheader("📊 Evaluasi Model (Dataset Baru)")
-        st.write("Akurasi:", round(acc, 4))
-        st.text(report)
+    st.subheader("📊 Evaluasi Model (Dataset Baru)")
+    st.write("Akurasi:", round(acc, 4))
+    st.text(report)
 
-        # Confusion Matrix
-        st.subheader("📉 Confusion Matrix")
-        cm = confusion_matrix(y, y_pred, labels=model.classes_)
-        fig, ax = plt.subplots()
-        disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.classes_)
-        disp.plot(ax=ax, cmap="Blues", colorbar=False)
-        st.pyplot(fig)
+    # Confusion Matrix
+    st.subheader("📉 Confusion Matrix")
+    cm = confusion_matrix(y, y_pred, labels=model.classes_)
+    fig, ax = plt.subplots()
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.classes_)
+    disp.plot(ax=ax, cmap="Blues", colorbar=False)
+    st.pyplot(fig)
 
-        # Hasil Prediksi
-        st.subheader("🔹 Hasil Prediksi (contoh 20 baris)")
-        st.dataframe(df_new[["full_text", "klasifikasi"]].head(20))
+    # Hasil Prediksi
+    st.subheader("🔹 Hasil Prediksi (contoh 20 baris)")
+    st.dataframe(df_new[[text_col, "klasifikasi"]].head(20))
 
-        # Distribusi Sentimen
-        st.subheader("📊 Distribusi Sentimen")
-        st.bar_chart(df_new["klasifikasi"].value_counts())
+    # Distribusi Sentimen
+    st.subheader("📊 Distribusi Sentimen")
+    st.bar_chart(df_new["klasifikasi"].value_counts())
 
-        # Wordcloud per Sentimen
-        st.subheader("☁️ Wordcloud per Sentimen")
-        sentiments = df_new["klasifikasi"].unique()
-        for sent in sentiments:
-            text_data = " ".join(df_new[df_new["klasifikasi"] == sent]["clean_text"])
-            if text_data.strip():
-                wc = WordCloud(width=600, height=400, background_color="white").generate(text_data)
-                st.write(f"**Sentimen: {sent}**")
-                fig, ax = plt.subplots()
-                ax.imshow(wc, interpolation="bilinear")
-                ax.axis("off")
-                st.pyplot(fig)
+    # Wordcloud per Sentimen
+    st.subheader("☁️ Wordcloud per Sentimen")
+    sentiments = df_new["klasifikasi"].unique()
+    for sent in sentiments:
+        text_data = " ".join(df_new[df_new["klasifikasi"] == sent]["clean_text"])
+        if text_data.strip():
+            wc = WordCloud(width=600, height=400, background_color="white").generate(text_data)
+            st.write(f"**Sentimen: {sent}**")
+            fig, ax = plt.subplots()
+            ax.imshow(wc, interpolation="bilinear")
+            ax.axis("off")
+            st.pyplot(fig)
