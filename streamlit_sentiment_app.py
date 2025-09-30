@@ -1,3 +1,5 @@
+# streamlit_sentiment_app.py
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -5,10 +7,10 @@ import re
 import nltk
 import matplotlib.pyplot as plt
 from wordcloud import WordCloud
-from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, ConfusionMatrixDisplay
+from textblob import TextBlob
 
 nltk.download("punkt")
 nltk.download("wordnet")
@@ -24,118 +26,96 @@ def preprocess_text(text):
     return text
 
 # ===============================
-# 2. TRAINING MODEL
+# 2. AUTO LABELING DENGAN TEXTBLOB
 # ===============================
-@st.cache_resource
-def train_model():
-    df_train = pd.read_excel("labeled_tweets.xlsx", sheet_name="Data Hasil")
-    text_col = "stemmed_text"
-    label_col = "klasifikasi"
-    df_train = df_train.dropna(subset=[text_col, label_col]).copy()
+def auto_label_with_textblob(df, text_col="clean_text"):
+    status = []
+    total_positif = total_negatif = total_netral = 0
 
-    X = df_train[text_col].astype(str)
-    y = df_train[label_col].astype(str)
+    for tweet in df[text_col]:
+        analysis = TextBlob(str(tweet))
+        if analysis.sentiment.polarity > 0.0:
+            status.append("Positif")
+            total_positif += 1
+        elif analysis.sentiment.polarity == 0.0:
+            status.append("Netral")
+            total_netral += 1
+        else:
+            status.append("Negatif")
+            total_negatif += 1
 
-    vectorizer = TfidfVectorizer()
-    X_vec = vectorizer.fit_transform(X)
-
-    model = MultinomialNB()
-    model.fit(X_vec, y)
-
-    y_pred = model.predict(X_vec)
-    acc = accuracy_score(y, y_pred)
-    report = classification_report(y, y_pred, output_dict=False)
-    cm = confusion_matrix(y, y_pred, labels=model.classes_)
-
-    return model, vectorizer, acc, report, cm, model.classes_
+    df["klasifikasi"] = status
+    return df, total_positif, total_netral, total_negatif
 
 # ===============================
 # 3. STREAMLIT APP
 # ===============================
 st.title("📊 Sentiment Analysis App (Naïve Bayes + Streamlit)")
 
-# Train model once
-model, vectorizer, acc, report, cm, labels = train_model()
+vectorizer = TfidfVectorizer()
+model = MultinomialNB()
 
 # ===============================
 # 4. UPLOAD DATASET BARU
 # ===============================
-st.subheader("📂 Upload Dataset Baru untuk Prediksi")
+st.subheader("📂 Upload Dataset Baru untuk Analisis")
 uploaded_file = st.file_uploader("Upload file .xlsx", type=["xlsx"])
 
 if uploaded_file:
     df_new = pd.read_excel(uploaded_file)
 
-    # cek kolom teks
-    if "clean_text" in df_new.columns:
-        st.info("✅ Kolom 'clean_text' sudah tersedia, dipakai langsung.")
-    elif "full_text" in df_new.columns:
-        st.info("ℹ️ Membuat kolom 'clean_text' dari 'full_text'.")
-        df_new["clean_text"] = df_new["full_text"].astype(str).apply(preprocess_text)
+    if "full_text" not in df_new.columns:
+        st.error("Kolom 'full_text' tidak ditemukan dalam dataset!")
     else:
-        st.error("Dataset harus punya kolom 'clean_text' atau 'full_text'!")
-        st.stop()
+        # Preprocessing
+        df_new["clean_text"] = df_new["full_text"].astype(str).apply(preprocess_text)
 
-    # transformasi & prediksi
-    X_new = vectorizer.transform(df_new["clean_text"])
-    preds = model.predict(X_new)
-    df_new["predicted_sentiment"] = preds
+        # Auto labeling jika kolom klasifikasi tidak ada
+        if "klasifikasi" not in df_new.columns:
+            st.info("Kolom 'klasifikasi' tidak ditemukan → Label otomatis dibuat dengan TextBlob.")
+            df_new, pos, net, neg = auto_label_with_textblob(df_new, text_col="clean_text")
+            st.success(f"Label otomatis selesai: Positif={pos}, Netral={net}, Negatif={neg}")
 
-    # ===============================
-    # 5. EVALUASI MODEL (DATA TRAINING)
-    # ===============================
-    st.subheader("🔹 Evaluasi Model (Data Training)")
-    st.write("Akurasi Training:", round(acc, 4))
-    st.text(report)
+        # Training model dengan dataset baru
+        X = df_new["clean_text"].astype(str)
+        y = df_new["klasifikasi"].astype(str)
+        X_vec = vectorizer.fit_transform(X)
+        model.fit(X_vec, y)
 
-    # Confusion Matrix Training
-    st.subheader("📉 Confusion Matrix (Data Training)")
-    fig, ax = plt.subplots()
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
-    disp.plot(ax=ax, cmap="Blues", colorbar=False)
-    st.pyplot(fig)
+        # Evaluasi
+        y_pred = model.predict(X_vec)
+        acc = accuracy_score(y, y_pred)
+        report = classification_report(y, y_pred)
 
-    # ===============================
-    # 6. HASIL PREDIKSI DATASET BARU
-    # ===============================
-    st.subheader("🔹 Hasil Prediksi (contoh 20 baris)")
-    st.dataframe(df_new[["clean_text", "predicted_sentiment"]].head(20))
+        st.subheader("📊 Evaluasi Model (Dataset Baru)")
+        st.write("Akurasi:", round(acc, 4))
+        st.text(report)
 
-    # Distribusi Sentimen
-    st.subheader("📊 Distribusi Sentimen")
-    st.bar_chart(df_new["predicted_sentiment"].value_counts())
-
-    # Wordcloud per kelas
-    st.subheader("☁️ Wordcloud per Sentimen")
-    sentiments = df_new["predicted_sentiment"].unique()
-    for sent in sentiments:
-        text_data = " ".join(df_new[df_new["predicted_sentiment"] == sent]["clean_text"])
-        if text_data.strip():
-            wc = WordCloud(width=600, height=400, background_color="white").generate(text_data)
-            st.write(f"**Sentimen: {sent}**")
-            fig, ax = plt.subplots()
-            ax.imshow(wc, interpolation="bilinear")
-            ax.axis("off")
-            st.pyplot(fig)
-
-    # ===============================
-    # 7. EVALUASI DATASET BARU (JIKA ADA LABEL)
-    # ===============================
-    if "klasifikasi" in df_new.columns:
-        st.subheader("🔹 Evaluasi Dataset Baru (dengan Label Asli)")
-        y_true = df_new["klasifikasi"].astype(str)
-        y_pred = df_new["predicted_sentiment"]
-
-        acc_new = accuracy_score(y_true, y_pred)
-        report_new = classification_report(y_true, y_pred, output_dict=False)
-        cm_new = confusion_matrix(y_true, y_pred, labels=model.classes_)
-
-        st.write("Akurasi Dataset Baru:", round(acc_new, 4))
-        st.text(report_new)
-
-        # Confusion Matrix Baru
-        st.subheader("📉 Confusion Matrix (Dataset Baru)")
+        # Confusion Matrix
+        st.subheader("📉 Confusion Matrix")
+        cm = confusion_matrix(y, y_pred, labels=model.classes_)
         fig, ax = plt.subplots()
-        disp_new = ConfusionMatrixDisplay(confusion_matrix=cm_new, display_labels=labels)
-        disp_new.plot(ax=ax, cmap="Oranges", colorbar=False)
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.classes_)
+        disp.plot(ax=ax, cmap="Blues", colorbar=False)
         st.pyplot(fig)
+
+        # Hasil Prediksi
+        st.subheader("🔹 Hasil Prediksi (contoh 20 baris)")
+        st.dataframe(df_new[["full_text", "klasifikasi"]].head(20))
+
+        # Distribusi Sentimen
+        st.subheader("📊 Distribusi Sentimen")
+        st.bar_chart(df_new["klasifikasi"].value_counts())
+
+        # Wordcloud per Sentimen
+        st.subheader("☁️ Wordcloud per Sentimen")
+        sentiments = df_new["klasifikasi"].unique()
+        for sent in sentiments:
+            text_data = " ".join(df_new[df_new["klasifikasi"] == sent]["clean_text"])
+            if text_data.strip():
+                wc = WordCloud(width=600, height=400, background_color="white").generate(text_data)
+                st.write(f"**Sentimen: {sent}**")
+                fig, ax = plt.subplots()
+                ax.imshow(wc, interpolation="bilinear")
+                ax.axis("off")
+                st.pyplot(fig)
